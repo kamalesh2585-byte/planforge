@@ -1,0 +1,148 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  @apply bg-white text-black;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  @apply w-2 h-2;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-400 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-600;
+}
+
+/* Animation utilities */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.animate-slideIn {
+  animation: slideIn 0.3s ease-out;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Loading state */
+.skeleton {
+  @apply animate-pulse bg-gray-200;
+}
+
+/* Cards */
+.card {
+  @apply bg-white rounded-lg border border-gray-300 shadow-sm hover:shadow-md transition-shadow duration-200;
+}
+
+.card-sm {
+  @apply p-4;
+}
+
+.card-md {
+  @apply p-6;
+}
+
+.card-lg {
+  @apply p-8;
+}
+
+/* Status indicators */
+.status-running {
+  @apply bg-black text-white;
+}
+
+.status-idle {
+  @apply bg-gray-200 text-black;
+}
+
+.status-maintenance {
+  @apply bg-gray-400 text-white;
+}
+
+.status-failed {
+  @apply bg-gray-600 text-white;
+}
+
+/* Severity badges */
+.severity-info {
+  @apply bg-gray-100 text-black;
+}
+
+.severity-warning {
+  @apply bg-gray-300 text-black;
+}
+
+.severity-critical {
+  @apply bg-gray-700 text-white;
+}
+
+/* Smooth transitions */
+.transition-all {
+  transition: all 0.3s ease-out;
+}
+
+/* Focus states */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #000;
+  outline-offset: 2px;
+}
