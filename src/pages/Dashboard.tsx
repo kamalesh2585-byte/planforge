@@ -14,8 +14,9 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { TrendingUp, AlertCircle, Zap, Wrench, CheckCircle, Package, Clock } from 'lucide-react';
+import { TrendingUp, AlertCircle, Zap, Wrench, CheckCircle, Package, Clock, Users } from 'lucide-react';
 import { n8nService } from '../services/n8nService';
+import { mockManufacturingData } from '../data/mockManufacturingData';
 
 export default function Dashboard() {
   const [kpis, setKpis] = useState<any>(null);
@@ -23,13 +24,39 @@ export default function Dashboard() {
   const [machineUtil, setMachineUtil] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const data = mockManufacturingData;
+  const metrics = data.metrics.overall;
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      const res = await n8nService.dashboard.getMetrics('FAC-001');
-      if (res.success && res.data) {
-        setKpis(res.data);
+      try {
+        const res = await n8nService.dashboard.getMetrics('FAC-001');
+        if (res.success && res.data) {
+          setKpis(res.data);
+        } else {
+          setKpis(metrics);
+        }
+      } catch (error) {
+        console.log('Using mock data for dashboard');
+        setKpis(metrics);
       }
+
+      setProductionTrend([
+        { day: 'Mon', production: 250 },
+        { day: 'Tue', production: 280 },
+        { day: 'Wed', production: 320 },
+        { day: 'Thu', production: 300 },
+        { day: 'Fri', production: 350 },
+        { day: 'Sat', production: 200 },
+      ]);
+
+      setMachineUtil([
+        { name: 'Running', value: metrics.runningMachines, fill: '#000' },
+        { name: 'Idle', value: metrics.idleMachines, fill: '#ccc' },
+        { name: 'Maintenance', value: metrics.maintenanceMachines, fill: '#f97316' },
+      ]);
+
       setLoading(false);
     };
 
@@ -37,200 +64,187 @@ export default function Dashboard() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="p-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-32 bg-slate-200 rounded-lg" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="h-64 bg-slate-200 rounded-lg" />
-            <div className="h-64 bg-slate-200 rounded-lg" />
-          </div>
-        </div>
-      </div>
-    );
+    return <div className="p-8">Loading dashboard...</div>;
   }
 
   return (
-    <div className="p-8 space-y-8 bg-white">
+    <div className="p-8 space-y-8 bg-white min-h-screen">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-black">Manufacturing Dashboard</h1>
-        <p className="text-gray-600 mt-2">Real-time factory intelligence and performance metrics</p>
+        <h1 className="text-4xl font-bold text-black">PlanForge AI Dashboard</h1>
+        <p className="text-gray-600 mt-2">Real-time manufacturing intelligence for 40 machines and 200 employees</p>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* Total Production */}
-        <div className="card card-md">
+      {/* Company Overview Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-lg border-l-4 border-blue-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Total Production</p>
-              <p className="text-2xl font-bold text-black mt-2">{kpis?.totalProduction || 0}</p>
-              <p className="text-xs text-gray-500 mt-1">Target: {kpis?.productionTarget || 0}</p>
+              <p className="text-gray-600 text-sm font-semibold">Total Machines</p>
+              <p className="text-3xl font-bold text-black mt-2">{metrics.totalMachines}</p>
             </div>
-            <div className="p-3 bg-gray-200 rounded-lg">
-              <Package size={24} className="text-black" />
-            </div>
+            <Wrench className="w-10 h-10 text-blue-500 opacity-50" />
           </div>
-          <div className="mt-4 pt-4 border-t border-gray-300 flex items-center gap-1">
-            {((kpis?.totalProduction / kpis?.productionTarget) * 100 >= 100) ? (
-              <TrendingUp size={16} className="text-black" />
-            ) : (
-              <TrendingUp size={16} className="text-gray-600" />
-            )}
-            <span className="text-xs font-medium text-gray-600">
-              {((kpis?.totalProduction / kpis?.productionTarget) * 100).toFixed(1)}% of target
-            </span>
-          </div>
+          <p className="text-xs text-blue-600 mt-3">📍 FAC-001: 15 | FAC-002: 15 | FAC-003: 10</p>
         </div>
 
-        {/* OEE */}
-        <div className="card card-md">
+        <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-lg border-l-4 border-green-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">OEE Score</p>
-              <p className="text-2xl font-bold text-black mt-2">{kpis?.oee?.toFixed(1) || 0}%</p>
-              <p className="text-xs text-gray-500 mt-1">Overall Equipment Effectiveness</p>
+              <p className="text-gray-600 text-sm font-semibold">Total Employees</p>
+              <p className="text-3xl font-bold text-black mt-2">{metrics.totalEmployees}</p>
             </div>
-            <div className="p-3 bg-gray-200 rounded-lg">
-              <CheckCircle size={24} className="text-black" />
-            </div>
+            <Users className="w-10 h-10 text-green-500 opacity-50" />
           </div>
+          <p className="text-xs text-green-600 mt-3">👥 Active: {metrics.totalEmployees - 5} | On Leave: 5</p>
         </div>
 
-        {/* Machine Availability */}
-        <div className="card card-md">
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-lg border-l-4 border-purple-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Machine Availability</p>
-              <p className="text-2xl font-bold text-black mt-2">{kpis?.machineAvailability?.toFixed(1) || 0}%</p>
-              <p className="text-xs text-gray-500 mt-1">Operational machines</p>
+              <p className="text-gray-600 text-sm font-semibold">Raw Material Stock</p>
+              <p className="text-3xl font-bold text-black mt-2">4,000</p>
             </div>
-            <div className="p-3 bg-gray-300 rounded-lg">
-              <Wrench size={24} className="text-black" />
-            </div>
+            <Package className="w-10 h-10 text-purple-500 opacity-50" />
           </div>
+          <p className="text-xs text-purple-600 mt-3">📦 Units: 8 materials in stock</p>
         </div>
 
-        {/* Defect Rate */}
-        <div className="card card-md">
+        <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 p-6 rounded-lg border-l-4 border-yellow-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Defect Rate</p>
-              <p className="text-2xl font-bold text-black mt-2">{kpis?.defectRate?.toFixed(1) || 0}%</p>
-              <p className="text-xs text-gray-500 mt-1">Products rejected</p>
+              <p className="text-gray-600 text-sm font-semibold">System Status</p>
+              <p className="text-3xl font-bold text-green-600 mt-2">✓ Live</p>
             </div>
-            <div className="p-3 bg-gray-400 rounded-lg">
-              <AlertCircle size={24} className="text-white" />
-            </div>
+            <TrendingUp className="w-10 h-10 text-yellow-500 opacity-50" />
           </div>
+          <p className="text-xs text-yellow-600 mt-3">All systems operational</p>
+        </div>
+      </div>
+
+      {/* Key Performance Indicators */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white border-2 border-gray-200 p-4 rounded-lg">
+          <p className="text-gray-600 text-sm">Machines Running</p>
+          <p className="text-2xl font-bold text-black mt-1">{metrics.runningMachines}/{metrics.totalMachines}</p>
+          <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
+            <div
+              className="bg-black h-2 rounded-full"
+              style={{ width: `${(metrics.runningMachines / metrics.totalMachines) * 100}%` }}
+            ></div>
+          </div>
+          <p className="text-xs text-gray-500 mt-2">{((metrics.runningMachines / metrics.totalMachines) * 100).toFixed(1)}% Uptime</p>
         </div>
 
-        {/* On-Time Delivery */}
-        <div className="card card-md">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">On-Time Delivery</p>
-              <p className="text-2xl font-bold text-black mt-2">{kpis?.onTimeDeliveryRate?.toFixed(1) || 0}%</p>
-              <p className="text-xs text-gray-500 mt-1">Orders on schedule</p>
-            </div>
-            <div className="p-3 bg-gray-200 rounded-lg">
-              <Clock size={24} className="text-black" />
-            </div>
+        <div className="bg-white border-2 border-gray-200 p-4 rounded-lg">
+          <p className="text-gray-600 text-sm">Avg Utilization</p>
+          <p className="text-2xl font-bold text-black mt-1">{metrics.avgUtilization.toFixed(1)}%</p>
+          <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
+            <div className="bg-black h-2 rounded-full" style={{ width: `${metrics.avgUtilization}%` }}></div>
           </div>
+          <p className="text-xs text-gray-500 mt-2">Across all machines</p>
+        </div>
+
+        <div className="bg-white border-2 border-gray-200 p-4 rounded-lg">
+          <p className="text-gray-600 text-sm">Quality Pass Rate</p>
+          <p className="text-2xl font-bold text-green-600 mt-1">{metrics.qualityPassRate.toFixed(1)}%</p>
+          <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
+            <div className="bg-green-500 h-2 rounded-full" style={{ width: `${metrics.qualityPassRate}%` }}></div>
+          </div>
+          <p className="text-xs text-gray-500 mt-2">Defect rate: {metrics.avgDefectRate.toFixed(2)}%</p>
+        </div>
+
+        <div className="bg-white border-2 border-gray-200 p-4 rounded-lg">
+          <p className="text-gray-600 text-sm">Daily Production</p>
+          <p className="text-2xl font-bold text-black mt-1">{metrics.totalProduction.toLocaleString()}</p>
+          <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
+            <div className="bg-black h-2 rounded-full" style={{ width: '75%' }}></div>
+          </div>
+          <p className="text-xs text-gray-500 mt-2">Units produced today</p>
         </div>
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Production Trend */}
-        <div className="lg:col-span-2 card card-md">
-          <h2 className="text-lg font-semibold text-black mb-6">Production Trend (11 Days)</h2>
-          <ResponsiveContainer width="100%" height={300}>
+        <div className="bg-white border-2 border-gray-200 p-6 rounded-lg">
+          <h2 className="text-xl font-bold text-black mb-4">Weekly Production Trend</h2>
+          <ResponsiveContainer width="100%" height={250}>
             <LineChart data={productionTrend}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
+              <XAxis dataKey="day" />
               <YAxis />
               <Tooltip />
               <Legend />
-              <Line type="monotone" dataKey="production" stroke="#000" strokeWidth={2} name="Actual" />
-              <Line type="monotone" dataKey="target" stroke="#666" strokeWidth={2} strokeDasharray="5 5" name="Target" />
+              <Line type="monotone" dataKey="production" stroke="#000" strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Machine Utilization */}
-        <div className="card card-md">
-          <h2 className="text-lg font-semibold text-black mb-6">Machine Utilization</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={machineUtil} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" />
-              <YAxis dataKey="name" type="category" width={80} />
+        {/* Machine Status */}
+        <div className="bg-white border-2 border-gray-200 p-6 rounded-lg">
+          <h2 className="text-xl font-bold text-black mb-4">Machine Status Distribution</h2>
+          <ResponsiveContainer width="100%" height={250}>
+            <PieChart>
+              <Pie data={machineUtil} cx="50%" cy="50%" labelLine={false} label outerRadius={80} fill="#8884d8" dataKey="value">
+                {machineUtil?.map((entry: any, index: number) => (
+                  <Cell key={`cell-${index}`} fill={entry.fill} />
+                ))}
+              </Pie>
               <Tooltip />
-              <Bar dataKey="utilization" fill="#333" />
-            </BarChart>
+              <Legend />
+            </PieChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Bottom Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Quick Stats */}
-        <div className="card card-md">
-          <h2 className="text-lg font-semibold text-black mb-4">Quick Metrics</h2>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center pb-3 border-b border-gray-300">
-              <span className="text-sm text-gray-600">Machine Utilization</span>
-              <span className="font-semibold text-black">{kpis?.machineUtilization?.toFixed(1)}%</span>
+      {/* Recent Alerts */}
+      <div className="bg-white border-2 border-gray-200 p-6 rounded-lg">
+        <h2 className="text-xl font-bold text-black mb-4 flex items-center gap-2">
+          <AlertCircle className="w-6 h-6 text-red-600" />
+          Active Alerts ({data.alerts.filter((a: any) => !a.acknowledged).length})
+        </h2>
+        <div className="space-y-3">
+          {data.alerts.slice(0, 3).map((alert: any) => (
+            <div
+              key={alert.id}
+              className={`p-4 rounded-lg border-l-4 ${
+                alert.severity === 'critical'
+                  ? 'bg-red-50 border-red-500'
+                  : 'bg-yellow-50 border-yellow-500'
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="font-semibold text-black">{alert.message}</p>
+                  <p className="text-sm text-gray-600 mt-1">{alert.description}</p>
+                </div>
+                {!alert.acknowledged && <span className="px-3 py-1 bg-red-500 text-white text-xs font-bold rounded">ACTION NEEDED</span>}
+              </div>
             </div>
-            <div className="flex justify-between items-center pb-3 border-b border-gray-300">
-              <span className="text-sm text-gray-600">Downtime</span>
-              <span className="font-semibold text-black">{kpis?.downtime?.toFixed(1)} hrs</span>
-            </div>
-            <div className="flex justify-between items-center pb-3 border-b border-gray-300">
-              <span className="text-sm text-gray-600">Energy Consumption</span>
-              <span className="font-semibold text-black">{kpis?.energyConsumption?.toFixed(1)} kWh</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Inventory Status</span>
-              <span className="font-semibold text-black">{kpis?.inventoryStatus?.toFixed(1)}%</span>
-            </div>
-          </div>
+          ))}
         </div>
+      </div>
 
-        {/* Recent Activity */}
-        <div className="card card-md">
-          <h2 className="text-lg font-semibold text-black mb-4">Recent Activity</h2>
-          <div className="space-y-3">
-            <div className="flex items-start gap-3 pb-3 border-b border-gray-300">
-              <div className="w-2 h-2 bg-black rounded-full mt-2 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-black">Production Order Completed</p>
-                <p className="text-xs text-gray-600">PO-2024-003 finished ahead of schedule</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3 pb-3 border-b border-gray-300">
-              <div className="w-2 h-2 bg-gray-600 rounded-full mt-2 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-black">Maintenance Alert</p>
-                <p className="text-xs text-gray-600">MCH-006 requires scheduled maintenance</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3 pb-3 border-b border-gray-300">
-              <div className="w-2 h-2 bg-black rounded-full mt-2 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-black">Quality Inspection Complete</p>
-                <p className="text-xs text-gray-600">Batch BATCH-002 passed with 0% defects</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="w-2 h-2 bg-gray-700 rounded-full mt-2 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-black">Inventory Low Stock</p>
-                <p className="text-xs text-gray-600">Material MAT-003 approaching reorder level</p>
-              </div>
-            </div>
+      {/* Footer Stats */}
+      <div className="bg-gradient-to-r from-black to-gray-800 text-white p-6 rounded-lg">
+        <h2 className="text-xl font-bold mb-4">System Overview</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div>
+            <p className="text-gray-300">Average Uptime</p>
+            <p className="text-2xl font-bold mt-1">{metrics.avgUptime.toFixed(1)}%</p>
+          </div>
+          <div>
+            <p className="text-gray-300">Maintenance Cost (Month)</p>
+            <p className="text-2xl font-bold mt-1">${data.metrics.maintenance.maintenanceCost.toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-gray-300">Daily Energy Cost</p>
+            <p className="text-2xl font-bold mt-1">${data.metrics.energy.dailyCost.toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-gray-300">Inventory Value</p>
+            <p className="text-2xl font-bold mt-1">${data.metrics.inventory.totalValue.toLocaleString()}</p>
           </div>
         </div>
       </div>

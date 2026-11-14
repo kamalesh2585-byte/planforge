@@ -165,36 +165,49 @@ Be professional, concise, and data-driven in your responses.
     const data = mockManufacturingData;
 
     // Machine Analysis
-    if (q.includes('machine') && (q.includes('problem') || q.includes('issue') || q.includes('health'))) {
+    if (q.includes('machine') && (q.includes('problem') || q.includes('issue') || q.includes('health') || q.includes('status'))) {
       const unhealthyMachines = data.machines.filter((m) => m.health < 80);
       if (unhealthyMachines.length === 0) {
-        return `✅ All machines are in good health! Average machine health: ${(
-          data.machines.reduce((sum, m) => sum + m.health, 0) / data.machines.length
-        ).toFixed(1)}%`;
+        return `✅ **All ${data.machines.length} machines are in good health!**
+
+Average machine health: ${(data.machines.reduce((sum, m) => sum + m.health, 0) / data.machines.length).toFixed(1)}%
+
+**Status Breakdown:**
+- Running: ${data.machines.filter(m => m.status === 'running').length}
+- Idle: ${data.machines.filter(m => m.status === 'idle').length}
+- Maintenance: ${data.machines.filter(m => m.status === 'maintenance').length}
+
+All machines are performing well. Keep up with scheduled maintenance!`;
       }
-      let response = `⚠️ Machines Requiring Attention:\n\n`;
-      unhealthyMachines.forEach((m) => {
-        response += `• ${m.name} (${m.id}): Health ${m.health}% - Status: ${m.status}\n`;
-        response += `  Uptime: ${m.uptime}%, Utilization: ${m.utilization}%\n`;
-        response += `  Defect Rate: ${m.defectRate}%\n`;
+      let response = `⚠️ **Machines Requiring Attention** (${unhealthyMachines.length}/${data.machines.length}):\n\n`;
+      unhealthyMachines.slice(0, 5).forEach((m) => {
+        response += `• **${m.id}** (${m.type})\n`;
+        response += `  Health: ${m.health.toFixed(1)}% | Status: ${m.status} | Utilization: ${m.utilization.toFixed(1)}%\n`;
+        response += `  Uptime: ${m.uptime.toFixed(1)}% | Defect Rate: ${m.defectRate.toFixed(2)}%\n`;
       });
-      response += `\n🔧 Recommendation: Schedule preventive maintenance for unhealthy machines.`;
+      if (unhealthyMachines.length > 5) {
+        response += `\n+ ${unhealthyMachines.length - 5} more machines\n`;
+      }
+      response += `\n🔧 **Recommendation:** Schedule preventive maintenance for these machines immediately.`;
       return response;
     }
 
     // Downtime Analysis
-    if (q.includes('downtime') || q.includes('idle')) {
-      const idleMachines = data.machines.filter((m) => m.status === 'idle' || m.utilization < 50);
-      if (idleMachines.length === 0) {
-        return `✅ All machines are actively running. No significant idle time detected.`;
+    if (q.includes('downtime') || q.includes('idle') || q.includes('offline')) {
+      const downtimeMachines = data.machines.filter((m) => m.status === 'idle' || m.status === 'offline' || m.utilization < 40);
+      if (downtimeMachines.length === 0) {
+        return `✅ **Great utilization!** All machines are actively producing.
+
+Average Utilization: ${data.metrics.overall.avgUtilization}%
+Average Uptime: ${data.metrics.overall.avgUptime}%`;
       }
-      let response = `📊 Machine Downtime Report:\n\n`;
-      idleMachines.forEach((m) => {
-        response += `• ${m.name}: ${m.downtime}hrs downtime, Utilization: ${m.utilization}%\n`;
+      let response = `📊 **Machine Downtime Report** (${downtimeMachines.length} machines):\n\n`;
+      downtimeMachines.slice(0, 8).forEach((m) => {
+        response += `• ${m.id}: Utilization ${m.utilization}% | Status: ${m.status}\n`;
       });
-      response += `\nAverage Downtime per Machine: ${(
-        data.machines.reduce((sum, m) => sum + m.downtime, 0) / data.machines.length
-      ).toFixed(1)} hours`;
+      response += `\n**Overall:**
+- Avg Downtime: ${data.metrics.overall.avgUptime < 85 ? 'High' : 'Low'}
+- Avg Utilization: ${data.metrics.overall.avgUtilization}%`;
       return response;
     }
 
@@ -202,17 +215,21 @@ Be professional, concise, and data-driven in your responses.
     if (q.includes('production') && (q.includes('status') || q.includes('order'))) {
       const inProgress = data.production.filter((p) => p.status === 'in_progress');
       const delayed = data.production.filter((p) => p.delayedDays > 0);
-      let response = `📦 Production Status:\n\n`;
-      response += `Total Orders: ${data.production.length}\n`;
-      response += `In Progress: ${inProgress.length}\n`;
-      response += `Completed: ${data.production.filter((p) => p.status === 'completed').length}\n`;
-      response += `Delayed: ${delayed.length}\n`;
-      response += `Overall Completion Rate: ${data.metrics.production.completionRate.toFixed(1)}%\n\n`;
+      const completed = data.production.filter((p) => p.status === 'completed');
+      let response = `📦 **Production Status Report:**\n\n`;
+      response += `**Overview:**
+- Total Orders: ${data.production.length}
+- Completed: ${completed.length}
+- In Progress: ${inProgress.length}
+- Planned: ${data.production.filter((p) => p.status === 'planned').length}
+- Completion Rate: ${data.metrics.production.completionRate}%\n\n`;
       if (delayed.length > 0) {
-        response += `⚠️ DELAYED ORDERS:\n`;
+        response += `⚠️ **DELAYED ORDERS** (${delayed.length}):\n`;
         delayed.forEach((p) => {
-          response += `• ${p.id}: ${p.delayedDays} days behind, ${p.completionPercentage}% complete\n`;
+          response += `• ${p.id} (${p.productName}): ${p.delayedDays} days late | ${p.completionPercentage}% done\n`;
         });
+      } else {
+        response += `✅ **No delayed orders!** All production on schedule.`;
       }
       return response;
     }
@@ -220,146 +237,165 @@ Be professional, concise, and data-driven in your responses.
     // Maintenance Forecast
     if (q.includes('maintenance') || q.includes('service') || q.includes('repair')) {
       const inProgress = data.maintenance.filter((m) => m.status === 'in_progress');
-      let response = `🔧 Maintenance Overview:\n\n`;
-      response += `Total Records: ${data.maintenance.length}\n`;
-      response += `Currently In Progress: ${inProgress.length}\n`;
-      response += `Total Cost: $${data.metrics.maintenance.maintenanceCost}\n\n`;
+      const completed = data.maintenance.filter((m) => m.status === 'completed');
+      let response = `🔧 **Maintenance Overview:**\n\n`;
+      response += `**Records:**
+- Total: ${data.maintenance.length}
+- Completed: ${completed.length}
+- In Progress: ${inProgress.length}
+- Monthly Cost: $${data.metrics.maintenance.maintenanceCost}
+- Avg Cost per Service: $${data.metrics.maintenance.avgCostPerMaintenance.toFixed(0)}\n\n`;
       if (inProgress.length > 0) {
-        response += `Current Maintenance Tasks:\n`;
+        response += `**Currently In Progress:**\n`;
         inProgress.forEach((m) => {
           response += `• ${m.machineName}: ${m.workDone}\n`;
-          response += `  Technician: ${m.technician}, Est. Completion: ${m.duration}hrs\n`;
+          response += `  Technician: ${m.technician} | Duration: ${m.duration}hrs\n`;
         });
       }
-      response += `\n📅 Next Maintenance Due: LOOM-001 on 2024-11-22`;
+      response += `\n📅 **Predictive:** ${data.predictions.filter(p => p.riskLevel === 'critical').length} machines need urgent maintenance`;
       return response;
     }
 
     // Quality Control
     if (q.includes('quality') || q.includes('defect') || q.includes('inspection')) {
+      const passedInspections = data.quality.filter((q) => q.status === 'completed');
       const failedInspections = data.quality.filter((q) => q.status === 'failed');
-      let response = `✅ Quality Control Report:\n\n`;
-      response += `Total Inspections: ${data.quality.length}\n`;
-      response += `Pass Rate: ${data.metrics.quality.passRate}%\n`;
-      response += `Average Defect Rate: ${data.metrics.quality.avgDefectRate}%\n`;
+      let response = `✅ **Quality Control Report:**\n\n`;
+      response += `**Statistics:**
+- Total Inspections: ${data.quality.length}
+- Passed: ${passedInspections.length}
+- Failed: ${failedInspections.length}
+- Pass Rate: ${data.metrics.quality.passRate}%
+- Avg Defect Rate: ${data.metrics.quality.avgDefectRate}%\n\n`;
       if (failedInspections.length > 0) {
-        response += `\n⚠️ Failed Inspections: ${failedInspections.length}\n`;
-        failedInspections.forEach((qi) => {
-          response += `• ${qi.batchId}: ${qi.defects} defects found\n`;
-          response += `  Issues: ${qi.issues.join(', ')}\n`;
-          response += `  Inspector: ${qi.inspector}\n`;
+        response += `⚠️ **Failed Inspections:**\n`;
+        failedInspections.slice(0, 3).forEach((qi) => {
+          response += `• Batch ${qi.batchId}: Issues found\n`;
         });
-        response += `\n🔍 Recommendations: Review process parameters and operator training.`;
+      } else {
+        response += `🎉 **Excellent quality!** All inspections passed.`;
       }
       return response;
     }
 
+    // Workforce
+    if (q.includes('employee') || q.includes('workforce') || q.includes('staff') || q.includes('team')) {
+      const operators = data.employees.filter((e) => e.role === 'Machine Operator').length;
+      const technicians = data.employees.filter((e) => e.role === 'Maintenance Technician').length;
+      const supervisors = data.employees.filter((e) => e.role === 'Supervisor').length;
+      let response = `👥 **Workforce Summary:**\n\n`;
+      response += `**Total Employees: ${data.employees.length}**
+
+**By Role:**
+- Machine Operators: ${operators}
+- Maintenance Technicians: ${technicians}
+- Inspectors: ${data.employees.filter((e) => e.role === 'Quality Inspector').length}
+- Supervisors: ${supervisors}
+- Administrative: ${data.employees.filter((e) => e.role === 'Administrative').length}\n\n`;
+      response += `**Performance:** All teams performing well with proper coverage across all shifts.`;
+      return response;
+    }
+
     // Inventory Management
-    if (q.includes('inventory') || q.includes('stock') || q.includes('material')) {
+    if (q.includes('inventory') || q.includes('stock') || q.includes('material') || q.includes('raw material')) {
       const lowStock = data.inventory.filter((i) => i.quantity < i.minStock);
-      let response = `📦 Inventory Status:\n\n`;
-      response += `Total Materials: ${data.inventory.length}\n`;
-      response += `Good Stock: ${data.inventory.length - lowStock.length}\n`;
-      response += `Low Stock: ${lowStock.length}\n`;
-      response += `Total Value: $${data.metrics.inventory.totalValue}\n\n`;
+      const goodStock = data.inventory.filter((i) => i.quantity >= i.minStock);
+      let response = `📦 **Inventory Status:**\n\n`;
+      response += `**Materials: ${data.inventory.length} types**
+- Good Stock: ${goodStock.length}
+- Low Stock: ${lowStock.length}
+- Total Units: ${data.metrics.inventory.totalUnits}
+- Total Value: $${data.metrics.inventory.totalValue.toLocaleString()}\n\n`;
       if (lowStock.length > 0) {
-        response += `⚠️ LOW STOCK ALERT:\n`;
+        response += `⚠️ **LOW STOCK ALERT** (${lowStock.length}):\n`;
         lowStock.forEach((i) => {
           response += `• ${i.name}: ${i.quantity}${i.unit} (Min: ${i.minStock}${i.unit})\n`;
           response += `  Supplier: ${i.supplier}\n`;
         });
-        response += `\n🛒 Action: Place urgent reorder to prevent production delays.`;
+        response += `\n🛒 **Action:** Place urgent reorder to prevent production delays.`;
+      } else {
+        response += `✅ **All materials well stocked!** No reorder needed.`;
       }
       return response;
     }
 
     // Energy Analysis
-    if (q.includes('energy') || q.includes('power') || q.includes('consumption')) {
-      let response = `⚡ Energy Consumption Analysis:\n\n`;
-      response += `Daily Consumption: ${data.metrics.energy.dailyConsumption} kWh\n`;
-      response += `Daily Cost: $${data.metrics.energy.dailyCost}\n`;
-      response += `Cost per Unit: $${data.metrics.energy.avgCostPerUnit}/kWh\n`;
-      response += `Efficiency Score: ${data.metrics.energy.efficiency}%\n`;
-      response += `Trend: ${data.metrics.energy.trend}\n\n`;
-      response += `💡 Tips for optimization:\n`;
-      response += `• LOOM-002 is highest consumer with peak usage at 12:00\n`;
-      response += `• Consolidate production runs to reduce idle energy\n`;
-      response += `• Schedule maintenance during off-peak hours\n`;
-      response += `• Estimated monthly savings: $5,000-7,000 with optimization`;
+    if (q.includes('energy') || q.includes('power') || q.includes('consumption') || q.includes('cost')) {
+      let response = `⚡ **Energy Consumption Analysis:**\n\n`;
+      response += `**Daily Metrics:**
+- Consumption: ${data.metrics.energy.dailyConsumption} kWh
+- Cost: $${data.metrics.energy.dailyCost}
+- Efficiency: ${data.metrics.energy.efficiency}%\n\n`;
+      response += `**Monthly Impact:**
+- ~${data.metrics.energy.dailyConsumption * 30} kWh
+- ~$${(data.metrics.energy.dailyCost * 30).toFixed(0)}\n\n`;
+      response += `💡 **Optimization Tips:**
+• Major looms consume most energy
+• Consolidate production runs to reduce idle time
+• Schedule maintenance during off-peak hours
+• Potential monthly savings: $5,000-7,000`;
       return response;
     }
 
     // Alerts & Issues
-    if (q.includes('alert') || q.includes('warning') || q.includes('critical')) {
+    if (q.includes('alert') || q.includes('warning') || q.includes('critical') || q.includes('issue')) {
       const unacknowledged = data.alerts.filter((a) => !a.acknowledged);
       const critical = data.alerts.filter((a) => a.severity === 'critical');
-      let response = `🚨 Active Alerts & Issues:\n\n`;
-      response += `Critical: ${critical.length}\n`;
-      response += `Unacknowledged: ${unacknowledged.length}\n`;
-      response += `Total Active: ${data.alerts.length}\n\n`;
+      let response = `🚨 **Active Alerts & Issues:**\n\n`;
+      response += `**Summary:**
+- Critical: ${critical.length}
+- Unacknowledged: ${unacknowledged.length}
+- Total Active: ${data.alerts.length}\n\n`;
       if (critical.length > 0) {
-        response += `🔴 CRITICAL ISSUES:\n`;
-        critical.forEach((a) => {
-          response += `• ${a.message}\n  → ${a.description}\n`;
+        response += `🔴 **CRITICAL ISSUES:**\n`;
+        critical.slice(0, 3).forEach((a) => {
+          response += `• ${a.message}\n  ${a.description}\n`;
         });
       }
-      response += `\n✅ Action: Address critical issues immediately to prevent production loss.`;
+      response += `\n✅ **Action:** Address critical issues immediately to prevent production loss.`;
       return response;
     }
 
-    // Overall Performance
-    if (q.includes('performance') || q.includes('efficiency') || q.includes('oee')) {
+    // Overall Performance / OEE
+    if (q.includes('performance') || q.includes('efficiency') || q.includes('oee') || q.includes('summary')) {
       const metrics = data.metrics.overall;
-      let response = `📈 Overall Performance Metrics:\n\n`;
-      response += `🏭 Machines:\n`;
-      response += `  Running: ${metrics.runningMachines}/${metrics.totalMachines}\n`;
-      response += `  Avg Utilization: ${metrics.avgUtilization}%\n`;
-      response += `  Avg Uptime: ${metrics.avgUptime}%\n\n`;
-      response += `📊 Production:\n`;
-      response += `  Completion Rate: ${data.metrics.production.completionRate}%\n`;
-      response += `  Total Production: ${metrics.totalProduction} units\n\n`;
-      response += `✅ Quality:\n`;
-      response += `  Pass Rate: ${data.metrics.quality.passRate}%\n`;
-      response += `  Avg Defect Rate: ${metrics.avgDefectRate}%\n\n`;
-      response += `💰 Economics:\n`;
-      response += `  Daily Energy Cost: $${data.metrics.energy.dailyCost}\n`;
-      response += `  Monthly Maintenance: $${data.metrics.maintenance.maintenanceCost}\n\n`;
-      response += `🎯 Overall Health: ${((metrics.avgUptime + metrics.avgUtilization) / 2).toFixed(1)}% - GOOD`;
-      return response;
-    }
-
-    // Summary Report
-    if (q.includes('summary') || q.includes('report') || q.includes('overview')) {
-      const metrics = data.metrics;
-      let response = `📋 MANUFACTURING INTELLIGENCE REPORT\n`;
-      response += `${'='.repeat(40)}\n\n`;
-      response += `✅ STRENGTHS:\n`;
-      response += `• ${metrics.overall.runningMachines} machines actively running\n`;
-      response += `• Quality pass rate: ${metrics.quality.passRate}%\n`;
-      response += `• Average uptime: ${metrics.overall.avgUptime}%\n\n`;
-      response += `⚠️ AREAS FOR IMPROVEMENT:\n`;
-      response += `• ${data.alerts.filter((a) => !a.acknowledged).length} unacknowledged alerts\n`;
-      response += `• ${data.inventory.filter((i) => i.quantity < i.minStock).length} materials at low stock\n`;
-      response += `• ${data.production.filter((p) => p.delayedDays > 0).length} delayed orders\n\n`;
-      response += `🎯 IMMEDIATE ACTIONS:\n`;
-      response += `1. Review failed QC batch (BATCH-002) - color bleeding issue\n`;
-      response += `2. Complete LOOM-004 maintenance to resume production\n`;
-      response += `3. Reorder low-stock materials (Polyester Yarn, Indigo Dye)\n`;
-      response += `4. Investigate LOOM-003 vibration issue\n`;
+      let response = `📈 **Overall Equipment Effectiveness (OEE) Report:**\n\n`;
+      response += `**🏭 Equipment Status (${metrics.totalMachines} Machines):**
+- Running: ${metrics.runningMachines}
+- Idle: ${metrics.idleMachines}
+- Maintenance: ${metrics.maintenanceMachines}
+- Avg Utilization: ${metrics.avgUtilization}%
+- Avg Uptime: ${metrics.avgUptime}%\n\n`;
+      response += `**📊 Production Metrics:**
+- Total Orders: ${metrics.totalProduction}
+- Completion Rate: ${data.metrics.production.completionRate}%
+- Delayed Orders: ${data.production.filter(p => p.delayedDays > 0).length}\n\n`;
+      response += `**✅ Quality Metrics:**
+- Pass Rate: ${data.metrics.quality.passRate}%
+- Avg Defect Rate: ${metrics.avgDefectRate}%\n\n`;
+      response += `**💰 Economics:**
+- Daily Energy: $${data.metrics.energy.dailyCost}
+- Monthly Maintenance: $${data.metrics.maintenance.maintenanceCost}\n\n`;
+      response += `**🎯 Overall Health:** ${((metrics.avgUptime + metrics.avgUtilization) / 2).toFixed(1)}% - ${(metrics.avgUptime + metrics.avgUtilization) / 2 > 80 ? '✅ EXCELLENT' : '⚠️ GOOD'}`;
       return response;
     }
 
     // Default helpful response
-    return `I can help you analyze your textile manufacturing operations! Ask me about:
+    return `👋 I can help you analyze your **PlanForge AI** textile manufacturing operations!
 
-🏭 **Machines** - Health, performance, downtime, maintenance
-📦 **Production** - Orders, schedules, delays, completion rates
-✅ **Quality** - Defects, inspections, pass rates, issues
-📊 **Inventory** - Stock levels, materials, reorder needs
-⚡ **Energy** - Consumption, costs, optimization
-🔧 **Maintenance** - Service records, preventive care, costs
-🚨 **Alerts** - Critical issues, warnings
-📈 **Performance** - KPIs, efficiency, overall health
+🏭 **Ask me about:**
+- **Machines** - Health, performance, downtime, maintenance, predictions
+- **Production** - Orders, schedules, delays, completion rates
+- **Quality** - Defects, inspections, pass rates
+- **Inventory** - Stock levels, materials (${data.inventory.length} types), reorder needs
+- **Workforce** - ${data.employees.length} employees, roles, performance
+- **Energy** - Consumption, costs, optimization
+- **Maintenance** - Service records, preventive care
+- **Alerts** - Critical issues, warnings
+- **Overall Performance** - KPIs, efficiency, OEE
+
+**Example questions:**
+"What machines need maintenance?" | "What's our production status?" | "Any quality issues?" | "Show me an efficiency report" | "Which materials are low?"
 
 What would you like to know?`;
   }

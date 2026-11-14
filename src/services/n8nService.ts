@@ -1,12 +1,7 @@
-import { TEXTILE_CONFIG } from '../config/api';
-
-const WEBHOOK_URL = import.meta.env.VITE_API_URL;
-
-interface N8nRequest {
-  action: string;
-  data: any;
-  [key: string]: any;
-}
+/**
+ * n8n Webhook Service - Enhanced with Error Handling
+ * Manages all backend API calls through n8n webhook
+ */
 
 interface N8nResponse {
   success: boolean;
@@ -15,177 +10,221 @@ interface N8nResponse {
   error?: string;
 }
 
+const WEBHOOK_URL = import.meta.env.VITE_API_URL || 'https://api.agents.snsihub.ai/webhook/71f5e821-4c67-40a7-b436-a004c36fe411';
+
 /**
- * Universal n8n webhook service for Textile Company
- * All requests go to the single n8n webhook endpoint
- * The n8n workflow determines the action based on the 'action' field
+ * Make API call with comprehensive error handling
  */
-export const n8nService = {
-  /**
-   * Send request to n8n webhook
-   * @param action - The action to perform in n8n workflow
-   * @param data - Data to send to backend
-   */
-  async call(action: string, data: any = {}): Promise<N8nResponse> {
-    try {
-      console.log(`📤 [${action}] Sending to n8n:`, data);
+async function callWebhook(action: string, payload: any): Promise<N8nResponse> {
+  try {
+    const fullPayload = {
+      action,
+      timestamp: new Date().toISOString(),
+      ...payload,
+    };
 
-      const response = await fetch(WEBHOOK_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action,
-          ...data,
-          timestamp: new Date().toISOString(),
-        }),
-      });
+    console.log(`📤 [n8n] Calling: ${action}`, fullPayload);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`❌ [${action}] Error:`, response.status, errorText);
-        return {
-          success: false,
-          error: `HTTP ${response.status}: ${errorText || 'No response'}`,
-        };
-      }
+    // Set timeout
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
 
-      const result = await response.json();
-      console.log(`✅ [${action}] Response:`, result);
+    const response = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify(fullPayload),
+      signal: controller.signal,
+    });
 
-      return {
-        success: result.success !== false,
-        message: result.message,
-        data: result.data || result,
-      };
-    } catch (error: any) {
-      console.error(`❌ [${action}] Exception:`, error);
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      console.error(`❌ HTTP Error: ${response.status}`);
       return {
         success: false,
-        error: error?.message || 'Network error',
+        error: `HTTP ${response.status}`,
+        message: `Server returned error ${response.status}. Please try again.`,
       };
     }
-  },
 
-  // Dashboard
-  dashboard: {
-    getMetrics: (factoryId: string) =>
-      n8nService.call('dashboard.getMetrics', { factoryId }),
-    getSummary: (factoryId: string) =>
-      n8nService.call('dashboard.getSummary', { factoryId }),
-  },
+    const data = await response.json();
+    console.log(`✅ Response:`, data);
 
-  // Production Orders
+    return {
+      success: true,
+      data: data?.data || data,
+      message: data?.message || 'Success',
+    };
+  } catch (error: any) {
+    console.error(`❌ Webhook Error:`, error);
+
+    if (error.name === 'AbortError') {
+      return {
+        success: false,
+        error: 'timeout',
+        message: 'Request timed out. Backend is not responding. Please check your connection.',
+      };
+    }
+
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      return {
+        success: false,
+        error: 'network',
+        message: 'Network error. Please check your internet connection.',
+      };
+    }
+
+    return {
+      success: false,
+      error: error?.message || 'Unknown error',
+      message: 'An error occurred. Please try again.',
+    };
+  }
+}
+
+// ==================== SERVICE DEFINITION ====================
+
+export const n8nService = {
+  call: (action: string, data?: any) => callWebhook(action, data || {}),
+
   production: {
-    createOrder: (orderData: any) =>
-      n8nService.call('production.createOrder', orderData),
-    getOrders: (factoryId: string, filters?: any) =>
-      n8nService.call('production.getOrders', { factoryId, ...filters }),
+    createOrder: (data: any) =>
+      callWebhook('production.createOrder', data),
+    getOrders: (factoryId: string) =>
+      callWebhook('production.getOrders', { factoryId }),
     updateOrder: (orderId: string, data: any) =>
-      n8nService.call('production.updateOrder', { orderId, ...data }),
-    deleteOrder: (orderId: string) =>
-      n8nService.call('production.deleteOrder', { orderId }),
+      callWebhook('production.updateOrder', { orderId, ...data }),
     startProduction: (orderId: string) =>
-      n8nService.call('production.start', { orderId }),
+      callWebhook('production.startProduction', { orderId }),
     pauseProduction: (orderId: string) =>
-      n8nService.call('production.pause', { orderId }),
+      callWebhook('production.pauseProduction', { orderId }),
     stopProduction: (orderId: string) =>
-      n8nService.call('production.stop', { orderId }),
+      callWebhook('production.stopProduction', { orderId }),
   },
 
-  // Loom/Machine Management
   machines: {
     getAll: (factoryId: string) =>
-      n8nService.call('machines.getAll', { factoryId }),
+      callWebhook('machines.getAll', { factoryId }),
     get: (machineId: string) =>
-      n8nService.call('machines.get', { machineId }),
+      callWebhook('machines.get', { machineId }),
     update: (machineId: string, data: any) =>
-      n8nService.call('machines.update', { machineId, ...data }),
+      callWebhook('machines.update', { machineId, ...data }),
     getStatus: (machineId: string) =>
-      n8nService.call('machines.getStatus', { machineId }),
+      callWebhook('machines.getStatus', { machineId }),
   },
 
-  // Yarn/Inventory
   inventory: {
     getItems: (factoryId: string) =>
-      n8nService.call('inventory.getItems', { factoryId }),
-    addItem: (itemData: any) =>
-      n8nService.call('inventory.addItem', itemData),
+      callWebhook('inventory.getItems', { factoryId }),
+    addItem: (data: any) =>
+      callWebhook('inventory.addItem', data),
     updateItem: (itemId: string, data: any) =>
-      n8nService.call('inventory.updateItem', { itemId, ...data }),
+      callWebhook('inventory.updateItem', { itemId, ...data }),
     getStock: (itemId: string) =>
-      n8nService.call('inventory.getStock', { itemId }),
+      callWebhook('inventory.getStock', { itemId }),
   },
 
-  // Quality Control
   quality: {
-    addInspection: (inspectionData: any) =>
-      n8nService.call('quality.addInspection', inspectionData),
+    addInspection: (data: any) =>
+      callWebhook('quality.addInspection', data),
     getInspections: (factoryId: string) =>
-      n8nService.call('quality.getInspections', { factoryId }),
-    getReport: (reportId: string) =>
-      n8nService.call('quality.getReport', { reportId }),
+      callWebhook('quality.getInspections', { factoryId }),
+    getReport: (batchId: string) =>
+      callWebhook('quality.getReport', { batchId }),
   },
 
-  // Maintenance
   maintenance: {
     getRecords: (factoryId: string) =>
-      n8nService.call('maintenance.getRecords', { factoryId }),
-    scheduleService: (machineId: string, date: string) =>
-      n8nService.call('maintenance.schedule', { machineId, date }),
-    recordService: (serviceData: any) =>
-      n8nService.call('maintenance.record', serviceData),
+      callWebhook('maintenance.getRecords', { factoryId }),
+    scheduleService: (data: any) =>
+      callWebhook('maintenance.scheduleService', data),
+    recordService: (data: any) =>
+      callWebhook('maintenance.recordService', data),
   },
 
-  // Users (Admin)
   users: {
-    getAll: () => n8nService.call('users.getAll'),
+    getAll: () => callWebhook('users.getAll', {}),
     create: (userData: any) =>
-      n8nService.call('users.create', userData),
+      callWebhook('users.create', userData),
     update: (userId: string, data: any) =>
-      n8nService.call('users.update', { userId, ...data }),
+      callWebhook('users.update', { userId, ...data }),
     delete: (userId: string) =>
-      n8nService.call('users.delete', { userId }),
+      callWebhook('users.delete', { userId }),
   },
 
-  // Audit Logs
   audit: {
     getLogs: (filters?: any) =>
-      n8nService.call('audit.getLogs', filters || {}),
+      callWebhook('audit.getLogs', filters || {}),
   },
 
-  // Alerts
   alerts: {
     getAlerts: (factoryId: string) =>
-      n8nService.call('alerts.getAlerts', { factoryId }),
+      callWebhook('alerts.getAlerts', { factoryId }),
     acknowledgeAlert: (alertId: string) =>
-      n8nService.call('alerts.acknowledge', { alertId }),
+      callWebhook('alerts.acknowledge', { alertId }),
   },
 
-  // Config/Settings
-  config: {
-    getFactories: () => Promise.resolve({ 
-      success: true, 
-      data: TEXTILE_CONFIG.factories 
-    }),
-    getDepartments: () => Promise.resolve({ 
-      success: true, 
-      data: TEXTILE_CONFIG.departments 
-    }),
-    getProductTypes: () => Promise.resolve({ 
-      success: true, 
-      data: TEXTILE_CONFIG.productTypes 
-    }),
+  dashboard: {
+    getMetrics: (factoryId: string) =>
+      callWebhook('dashboard.getMetrics', { factoryId }),
+    getSummary: (factoryId: string) =>
+      callWebhook('dashboard.getSummary', { factoryId }),
   },
 
-  // Energy Management
   energy: {
     getMetrics: (factoryId: string) =>
-      n8nService.call('energy.getMetrics', { factoryId }),
+      callWebhook('energy.getMetrics', { factoryId }),
     getConsumption: (factoryId: string) =>
-      n8nService.call('energy.getConsumption', { factoryId }),
+      callWebhook('energy.getConsumption', { factoryId }),
     getTrend: (factoryId: string) =>
-      n8nService.call('energy.getTrend', { factoryId }),
+      callWebhook('energy.getTrend', { factoryId }),
   },
+
+  config: {
+    getFactories: () => Promise.resolve({
+      success: true,
+      data: TEXTILE_CONFIG.factories,
+    }),
+    getDepartments: () => Promise.resolve({
+      success: true,
+      data: TEXTILE_CONFIG.departments,
+    }),
+    getProductTypes: () => Promise.resolve({
+      success: true,
+      data: TEXTILE_CONFIG.productTypes,
+    }),
+  },
+};
+
+// ==================== CONFIG ====================
+
+export const TEXTILE_CONFIG = {
+  companyName: 'PlanForge AI',
+  companyCode: 'PF',
+  factories: [
+    { id: 'FAC-001', name: 'Main Weaving Factory', code: 'FAC-001', location: 'Unit 1' },
+    { id: 'FAC-002', name: 'Yarn Processing', code: 'FAC-002', location: 'Unit 2' },
+    { id: 'FAC-003', name: 'Finishing Department', code: 'FAC-003', location: 'Unit 3' },
+  ],
+  departments: [
+    'Spinning',
+    'Weaving',
+    'Dyeing',
+    'Finishing',
+    'Quality Control',
+    'Maintenance',
+  ],
+  productTypes: [
+    'Cotton Fabric',
+    'Polyester Blend',
+    'Silk Fabric',
+    'Denim',
+    'Canvas',
+    'Linen',
+    'Wool Blend',
+    'Synthetic',
+  ],
 };
